@@ -193,6 +193,7 @@
 
   <script>
     let editIndex = -1;
+    let registrosFiltrados = [];
 
     function getRegistros() {
       return JSON.parse(localStorage.getItem("finanzas")) || [];
@@ -237,21 +238,35 @@
     }
 
     function editarRegistro(index) {
-      const registros = getRegistros();
-      const r = registros[index];
+      const r = registrosFiltrados[index];
       document.getElementById("tipo").value = r.tipo;
       document.getElementById("monto").value = r.monto;
       document.getElementById("descripcion").value = r.descripcion;
       document.getElementById("fecha").value = r.fecha;
       document.getElementById("form-title").textContent = "Editar Registro";
       document.getElementById("btn-guardar").textContent = "Guardar cambios";
-      editIndex = index;
+
+      // Para que edite correctamente en el almacenamiento
+      const todos = getRegistros();
+      editIndex = todos.findIndex(item =>
+        item.tipo === r.tipo &&
+        item.monto === r.monto &&
+        item.descripcion === r.descripcion &&
+        item.fecha === r.fecha
+      );
     }
 
     function eliminarRegistro(index) {
       if (!confirm("¿Estás seguro de eliminar este registro?")) return;
+      const r = registrosFiltrados[index];
       let registros = getRegistros();
-      registros.splice(index, 1);
+      const idx = registros.findIndex(item =>
+        item.tipo === r.tipo &&
+        item.monto === r.monto &&
+        item.descripcion === r.descripcion &&
+        item.fecha === r.fecha
+      );
+      if (idx >= 0) registros.splice(idx, 1);
       guardarRegistros(registros);
       mostrarResumen();
     }
@@ -271,13 +286,13 @@
       }
 
       const registros = getRegistros();
-      const filtrados = registros.filter(r => new Date(r.fecha) >= inicio);
+      registrosFiltrados = registros.filter(r => new Date(r.fecha) >= inicio);
 
       let ingresos = 0, gastos = 0;
       const tbody = document.querySelector("#tabla tbody");
       tbody.innerHTML = "";
 
-      filtrados.forEach((r, i) => {
+      registrosFiltrados.forEach((r, i) => {
         if (r.tipo === "ingreso") ingresos += r.monto;
         else gastos += r.monto;
 
@@ -298,11 +313,7 @@
       document.getElementById("gastos").textContent = gastos.toFixed(2);
       document.getElementById("balance").textContent = (ingresos - gastos).toFixed(2);
       const alerta = document.getElementById("alerta-equilibrio");
-      if (Math.abs(ingresos - gastos) < 0.01) {
-        alerta.style.display = "block";
-      } else {
-        alerta.style.display = "none";
-      }
+      alerta.style.display = Math.abs(ingresos - gastos) < 0.01 ? "block" : "none";
 
       mostrarGrafico(ingresos, gastos);
     }
@@ -331,13 +342,12 @@
     }
 
     function exportarExcel() {
-      const registros = getRegistros();
-      if (registros.length === 0) {
-        alert("No hay registros para exportar.");
+      if (registrosFiltrados.length === 0) {
+        alert("No hay registros para exportar en este rango.");
         return;
       }
 
-      const datos = registros.map(r => ({
+      const datos = registrosFiltrados.map(r => ({
         Tipo: r.tipo,
         Monto: r.monto,
         Descripción: r.descripcion,
@@ -348,7 +358,7 @@
       const libro = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(libro, hoja, "Finanzas");
 
-      XLSX.writeFile(libro, "registros_financieros.xlsx");
+      XLSX.writeFile(libro, "registros_filtrados.xlsx");
     }
 
     window.onload = () => {
